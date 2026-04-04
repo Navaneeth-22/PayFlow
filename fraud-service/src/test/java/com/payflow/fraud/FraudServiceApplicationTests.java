@@ -1,10 +1,10 @@
-package com.payflow.payment_service;
+package com.payflow.fraud;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 
 @SpringBootTest
-class PaymentServiceApplicationTests {
+class FraudServiceApplicationTests {
 
 	@Test
 	void contextLoads() {

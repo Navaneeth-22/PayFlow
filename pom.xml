@@ -14,7 +14,7 @@
     <modules>
         <module>payment-service</module>
 <!--        <module>ledger-service</module>-->
-<!--        <module>fraud-service</module>-->
+        <module>fraud-service</module>
 <!--        <module>notification-service</module>-->
 <!--        <module>api-gateway</module>-->
     </modules>
