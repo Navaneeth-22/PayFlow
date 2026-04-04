@@ -2,6 +2,7 @@ package com.payflow.payment.api.controller;
 
 import com.payflow.payment.api.dto.CreatePaymentRequest;
 import com.payflow.payment.api.dto.PaymentResponse;
+import com.payflow.payment.domain.service.PaymentService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,28 +18,19 @@ import java.util.UUID;
 @Slf4j
 public class PaymentController {
 
+    private final PaymentService paymentService;
+
     @PostMapping
     public ResponseEntity<PaymentResponse> initiatePayment(
             @RequestHeader("X-Idempotency-Key") String idempotencyKey,
             @Valid @RequestBody CreatePaymentRequest request) {
 
-        log.info("Payment request received. idempotencyKey={}, amount={}",
-                idempotencyKey, request.getAmount());
-
-        PaymentResponse stub = PaymentResponse.builder()
-                .paymentId(UUID.randomUUID())
-                .status("PENDING")
-                .amount(request.getAmount())
-                .currency(request.getCurrency())
-                .fromAccountId(request.getFromAccountId())
-                .toAccountId(request.getToAccountId())
-                .build();
-
-        return ResponseEntity.status(HttpStatus.ACCEPTED).body(stub);
+        PaymentResponse response = paymentService.initiatePayment(request, idempotencyKey);
+        return ResponseEntity.status(HttpStatus.ACCEPTED).body(response);
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<PaymentResponse> getPayment(@PathVariable UUID id) {
-        return ResponseEntity.notFound().build();
+        return ResponseEntity.ok(paymentService.getPayment(id));
     }
 }

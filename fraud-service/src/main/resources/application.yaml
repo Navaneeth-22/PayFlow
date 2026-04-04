@@ -43,6 +43,7 @@ spring:
       properties:
         spring.json.trusted.packages: "com.payflow.*"
         spring.json.use.type.headers: false
+        spring.json.value.default.type: com.payflow.fraud.messaging.dto.PaymentInitiatedEvent
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
