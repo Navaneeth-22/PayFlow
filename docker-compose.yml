@@ -1,0 +1,136 @@
+version: '3.8'
+
+services:
+
+  # ─── Databases (one per service) ───────────────────────────
+  postgres-payment:
+    image: postgres:16-alpine
+    container_name: payflow-postgres-payment
+    environment:
+      POSTGRES_DB: payflow_payment
+      POSTGRES_USER: payflow
+      POSTGRES_PASSWORD: secret
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-payment-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U payflow -d payflow_payment"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  postgres-ledger:
+    image: postgres:16-alpine
+    container_name: payflow-postgres-ledger
+    environment:
+      POSTGRES_DB: payflow_ledger
+      POSTGRES_USER: payflow
+      POSTGRES_PASSWORD: secret
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres-ledger-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U payflow -d payflow_ledger"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  postgres-fraud:
+    image: postgres:16-alpine
+    container_name: payflow-postgres-fraud
+    environment:
+      POSTGRES_DB: payflow_fraud
+      POSTGRES_USER: payflow
+      POSTGRES_PASSWORD: secret
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres-fraud-data:/var/lib/postgresql/data
+
+  postgres-notification:
+    image: postgres:16-alpine
+    container_name: payflow-postgres-notification
+    environment:
+      POSTGRES_DB: payflow_notification
+      POSTGRES_USER: payflow
+      POSTGRES_PASSWORD: secret
+    ports:
+      - "5435:5432"
+    volumes:
+      - postgres-notification-data:/var/lib/postgresql/data
+
+  # ─── Redis ─────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: payflow-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+
+  # ─── Kafka (KRaft mode — no ZooKeeper) ─────────────────────
+  kafka:
+    image: confluentinc/cp-kafka:7.6.0
+    container_name: payflow-kafka
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://localhost:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qg
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+
+  # ─── Kafka UI (see topics + messages visually) ──────────────
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: payflow-kafka-ui
+    ports:
+      - "8090:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: payflow-local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+    depends_on:
+      - kafka
+
+  # ─── Observability ──────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: payflow-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./infra/prometheus.yml:/etc/prometheus/prometheus.yml
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: payflow-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - grafana-data:/var/lib/grafana
+
+volumes:
+  postgres-payment-data:
+  postgres-ledger-data:
+  postgres-fraud-data:
+  postgres-notification-data:
+  redis-data:
+  grafana-data:
