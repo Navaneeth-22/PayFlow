@@ -1,6 +1,6 @@
-package com.payflow.fraud.outbox;
+package com.payflow.ledger.outbox;
 
-import com.payflow.fraud.domain.repository.OutboxEventRepository;
+import com.payflow.ledger.domain.repository.OutboxEventRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -44,7 +44,7 @@ public class OutboxPoller {
                         event.getEventType(), event.getAggregateId());
 
             } catch (Exception e) {
-                log.error("Failed to publish outbox event {}: {}",
+                log.error("Failed to publish outbox event {}, will retry: {}",
                         event.getId(), e.getMessage());
             }
         }

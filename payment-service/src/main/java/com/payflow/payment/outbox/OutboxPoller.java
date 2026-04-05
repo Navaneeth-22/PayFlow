@@ -25,7 +25,6 @@ public class OutboxPoller {
 
         for (var event : unpublished) {
             try {
-                // Convert "PAYMENT_INITIATED" → "payment.initiated"
                 String topic = event.getEventType()
                         .toLowerCase()
                         .replace("_", ".");

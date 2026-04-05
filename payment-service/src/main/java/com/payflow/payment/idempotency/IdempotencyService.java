@@ -32,8 +32,6 @@ public class IdempotencyService {
     public Optional<IdempotencyRecord> findInCache(String key) {
         Object cached = redisTemplate.opsForValue().get(REDIS_PREFIX + key);
         if (cached == null) return Optional.empty();
-
-        // Redis stored it as a Map (JSON), convert back to IdempotencyRecord
         IdempotencyRecord record = objectMapper.convertValue(cached, IdempotencyRecord.class);
         return Optional.of(record);
     }

@@ -2,12 +2,14 @@ package com.payflow.fraud.domain.service;
 
 import com.payflow.fraud.domain.model.FraudEvaluation;
 import com.payflow.fraud.domain.repository.FraudEvaluationRepository;
+import com.payflow.fraud.exception.FraudException;
 import com.payflow.fraud.messaging.dto.PaymentInitiatedEvent;
 import com.payflow.fraud.outbox.OutboxService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,7 +29,6 @@ public class FraudEvaluationService {
     private final OutboxService outboxService;
     private final RedisTemplate<String, Object> redisTemplate;
 
-    // Configurable thresholds — change without redeploying
     @Value("${fraud.rules.max-tx-per-60s:5}")
     private int maxTxPer60s;
 
@@ -45,6 +46,12 @@ public class FraudEvaluationService {
             return;
         }
 
+        if (event.getPaymentId() == null || event.getAmount() == null) {
+            throw new FraudException(
+                    "Malformed PAYMENT_INITIATED event — missing required fields",
+                    HttpStatus.BAD_REQUEST
+            );
+        }
         List<String> rulesChecked = new ArrayList<>();
         FraudResult result = runRules(event, rulesChecked);
 
@@ -98,7 +105,6 @@ public class FraudEvaluationService {
             );
         }
 
-        // Rule 3: Amount velocity — total amount in last 1 hour
         rulesChecked.add("VELOCITY_AMOUNT_1H");
         String amountKey = "fraud:amount:" + event.getUserId();
         long window1h = now - 3_600_000L;

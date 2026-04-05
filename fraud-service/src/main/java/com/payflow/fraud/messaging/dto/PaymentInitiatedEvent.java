@@ -1,4 +1,3 @@
-// PaymentInitiatedEvent.java
 package com.payflow.fraud.messaging.dto;
 
 import lombok.Data;
@@ -10,7 +9,7 @@ public class PaymentInitiatedEvent {
     private UUID paymentId;
     private UUID fromAccountId;
     private UUID toAccountId;
-    private UUID userId;           // who initiated the payment
+    private UUID userId;
     private BigDecimal amount;
     private String currency;
 }

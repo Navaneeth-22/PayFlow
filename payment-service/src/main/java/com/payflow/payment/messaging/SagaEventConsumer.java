@@ -1,64 +1,65 @@
 package com.payflow.payment.messaging;
 
-import com.payflow.payment.domain.model.*;
-import com.payflow.payment.domain.repository.*;
+import com.payflow.payment.domain.service.SagaService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Map;
-import java.util.UUID;
+
 @Component
 @RequiredArgsConstructor
 @Slf4j
 public class SagaEventConsumer {
 
-    private final SagaStateRepository sagaStateRepository;
-    private final PaymentRepository paymentRepository;
+    private final SagaService sagaService;
+
 
     @KafkaListener(topics = "fraud.cleared", groupId = "payment-service-fraud-group")
-    @Transactional
     public void onFraudCleared(Map<String, Object> event) {
-        UUID paymentId = UUID.fromString((String) event.get("paymentId"));
-        log.info("FRAUD_CLEARED received for paymentId: {}", paymentId);
-        SagaState saga = sagaStateRepository.findById(paymentId).orElse(null);
-        if (saga == null || saga.getStatus() != SagaStatus.FRAUD_CHECK) {
-            log.warn("Skipping FRAUD_CLEARED — saga not in FRAUD_CHECK state. paymentId={}", paymentId);
-            return;
+        try {
+            log.info("FRAUD_CLEARED received: paymentId={}", event.get("paymentId"));
+            sagaService.handleFraudCleared(event);
+        } catch (Exception e) {
+
+            log.error("Failed to process FRAUD_CLEARED event={} error={}",
+                    event, e.getMessage(), e);
         }
-
-
-        saga.setStatus(SagaStatus.DEBITING);
-        saga.setLastEvent("FRAUD_CLEARED");
-        sagaStateRepository.save(saga);
-
-        log.info("Saga advanced: FRAUD_CHECK → DEBITING for paymentId: {}", paymentId);
     }
 
     @KafkaListener(topics = "fraud.flagged", groupId = "payment-service-fraud-group")
-    @Transactional
     public void onFraudFlagged(Map<String, Object> event) {
-        UUID paymentId = UUID.fromString((String) event.get("paymentId"));
-        String reason = (String) event.get("reason");
-        log.info("FRAUD_FLAGGED received for paymentId: {} reason: {}", paymentId, reason);
-
-        SagaState saga = sagaStateRepository.findById(paymentId).orElse(null);
-        if (saga == null || saga.getStatus() != SagaStatus.FRAUD_CHECK) {
-            log.warn("Skipping FRAUD_FLAGGED — saga not in FRAUD_CHECK state. paymentId={}", paymentId);
-            return;
+        try {
+            log.info("FRAUD_FLAGGED received: paymentId={} reason={}",
+                    event.get("paymentId"), event.get("reason"));
+            sagaService.handleFraudFlagged(event);
+        } catch (Exception e) {
+            log.error("Failed to process FRAUD_FLAGGED event={} error={}",
+                    event, e.getMessage(), e);
         }
-        saga.setStatus(SagaStatus.FAILED);
-        saga.setLastEvent("FRAUD_FLAGGED");
-        saga.setFailureReason(reason);
-        sagaStateRepository.save(saga);
-        paymentRepository.findById(paymentId).ifPresent(payment -> {
-            payment.setStatus(PaymentStatus.FAILED);
-            payment.setFailureReason("Fraud check failed: " + reason);
-            paymentRepository.save(payment);
-        });
+    }
 
-        log.info("Saga FAILED at fraud check for paymentId: {} reason: {}", paymentId, reason);
+    @KafkaListener(topics = "ledger.debited", groupId = "payment-service-ledger-group")
+    public void onLedgerDebited(Map<String, Object> event) {
+        try {
+            log.info("LEDGER_DEBITED received: paymentId={}", event.get("paymentId"));
+            sagaService.handleLedgerDebited(event);
+        } catch (Exception e) {
+            log.error("Failed to process LEDGER_DEBITED event={} error={}",
+                    event, e.getMessage(), e);
+        }
+    }
+
+    @KafkaListener(topics = "ledger.failed", groupId = "payment-service-ledger-group")
+    public void onLedgerFailed(Map<String, Object> event) {
+        try {
+            log.info("LEDGER_FAILED received: paymentId={} reason={}",
+                    event.get("paymentId"), event.get("reason"));
+            sagaService.handleLedgerFailed(event);
+        } catch (Exception e) {
+            log.error("Failed to process LEDGER_FAILED event={} error={}",
+                    event, e.getMessage(), e);
+        }
     }
 }
