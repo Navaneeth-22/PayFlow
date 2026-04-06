@@ -2,6 +2,7 @@ package com.payflow.payment.domain.service;
 
 import com.payflow.payment.domain.model.*;
 import com.payflow.payment.domain.repository.*;
+import com.payflow.payment.outbox.OutboxService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -16,6 +17,7 @@ public class SagaService {
 
     private final SagaStateRepository sagaStateRepository;
     private final PaymentRepository paymentRepository;
+    private final OutboxService outboxService;
 
     @Transactional
     public void handleFraudCleared(Map<String, Object> event) {
@@ -70,6 +72,18 @@ public class SagaService {
             paymentRepository.save(payment);
         });
 
+        outboxService.save(
+                paymentId,
+                "PAYMENT",
+                "PAYMENT_FAILED",
+                Map.of(
+                        "paymentId",      paymentId.toString(),
+                        "fromAccountId",  "",
+                        "failureReason",  reason != null ? reason : "",
+                        "status",         "FAILED"
+                )
+        );
+
         log.info("Saga FAILED (fraud) for paymentId={} reason={}", paymentId, reason);
     }
 
@@ -98,7 +112,21 @@ public class SagaService {
         paymentRepository.findById(paymentId).ifPresent(payment -> {
             payment.setStatus(PaymentStatus.COMPLETED);
             paymentRepository.save(payment);
+            outboxService.save(
+                    paymentId,
+                    "PAYMENT",
+                    "PAYMENT_COMPLETED",
+                    Map.of(
+                            "paymentId",     paymentId.toString(),
+                            "fromAccountId", payment.getFromAccountId().toString(),
+                            "toAccountId",   payment.getToAccountId().toString(),
+                            "amount",        payment.getAmount(),
+                            "currency",      payment.getCurrency(),
+                            "status",        "COMPLETED"
+                    )
+            );
         });
+
 
         log.info("Saga COMPLETED for paymentId={} — money has moved", paymentId);
     }
@@ -131,6 +159,17 @@ public class SagaService {
             payment.setFailureReason(reason);
             paymentRepository.save(payment);
         });
+        outboxService.save(
+                paymentId,
+                "PAYMENT",
+                "PAYMENT_FAILED",
+                Map.of(
+                        "paymentId",      paymentId.toString(),
+                        "fromAccountId",  "",
+                        "failureReason",  reason != null ? reason : "",
+                        "status",         "FAILED"
+                )
+        );
 
         log.info("Saga FAILED (ledger) for paymentId={} reason={}", paymentId, reason);
     }
