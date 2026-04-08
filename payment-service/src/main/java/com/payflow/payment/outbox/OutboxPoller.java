@@ -29,9 +29,13 @@ public class OutboxPoller {
                         .toLowerCase()
                         .replace("_", ".");
 
+                String partitionKey = event.getPayload().containsKey("fromAccountId")
+                        ? (String) event.getPayload().get("fromAccountId")
+                        : event.getAggregateId().toString();
+
                 kafkaTemplate.send(
                         topic,
-                        event.getAggregateId().toString(),
+                        partitionKey,
                         event.getPayload()
                 ).get();
 

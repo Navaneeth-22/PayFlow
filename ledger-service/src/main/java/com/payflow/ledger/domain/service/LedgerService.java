@@ -42,6 +42,9 @@ public class LedgerService {
         BigDecimal amount  = new BigDecimal(event.get("amount").toString());
         String currency    = (String) event.get("currency");
 
+        journalEntryRepository.lockAccount(fromAccountId.toString());
+
+
         if (cancelledPaymentRepository.existsByPaymentId(paymentId)) {
             log.warn("Rejecting fraud.cleared for CANCELLED payment: paymentId={}",
                     paymentId);

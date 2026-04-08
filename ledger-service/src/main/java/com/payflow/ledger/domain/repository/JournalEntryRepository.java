@@ -17,4 +17,8 @@ public interface JournalEntryRepository extends JpaRepository<JournalEntry, UUID
     boolean existsByEntryRef(String entryRef);
 
     List<JournalEntry> findByPaymentId(UUID paymentId);
+
+    @Query(value = "SELECT pg_advisory_xact_lock(hashtext(:accountId))",
+            nativeQuery = true)
+    void lockAccount(@Param("accountId") String accountId);
 }
