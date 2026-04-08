@@ -62,4 +62,15 @@ public class SagaEventConsumer {
                     event, e.getMessage(), e);
         }
     }
+
+    @KafkaListener(topics = "ledger.reversed", groupId = "payment-service-ledger-group")
+    public void onLedgerReversed(Map<String, Object> event) {
+        try {
+            log.info("LEDGER_REVERSED received: paymentId={}", event.get("paymentId"));
+            sagaService.handleLedgerReversed(event);
+        } catch (Exception e) {
+            log.error("Failed to process LEDGER_REVERSED: paymentId={} error={}",
+                    event.get("paymentId"), e.getMessage(), e);
+        }
+    }
 }

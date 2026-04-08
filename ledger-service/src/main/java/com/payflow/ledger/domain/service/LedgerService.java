@@ -3,14 +3,8 @@ package com.payflow.ledger.domain.service;
 import com.payflow.ledger.api.dto.BalanceResponse;
 import com.payflow.ledger.api.dto.StatementLineResponse;
 import com.payflow.ledger.api.dto.StatementResponse;
-import com.payflow.ledger.domain.model.AccountBalance;
-import com.payflow.ledger.domain.model.AccountStatement;
-import com.payflow.ledger.domain.model.JournalEntry;
-import com.payflow.ledger.domain.model.SystemAccount;
-import com.payflow.ledger.domain.repository.AccountBalanceRepository;
-import com.payflow.ledger.domain.repository.AccountStatementRepository;
-import com.payflow.ledger.domain.repository.JournalEntryRepository;
-import com.payflow.ledger.domain.repository.SystemAccountRepository;
+import com.payflow.ledger.domain.model.*;
+import com.payflow.ledger.domain.repository.*;
 import com.payflow.ledger.exception.DuplicateEntryException;
 import com.payflow.ledger.exception.LedgerException;
 import com.payflow.ledger.outbox.OutboxService;
@@ -38,6 +32,7 @@ public class LedgerService {
     private final AccountStatementRepository accountStatementRepository;
     private final SystemAccountRepository systemAccountRepository;
     private final OutboxService outboxService;
+    private final CancelledPaymentRepository cancelledPaymentRepository;
 
     @Transactional
     public void processPayment(Map<String, Object> event) {
@@ -47,10 +42,20 @@ public class LedgerService {
         BigDecimal amount  = new BigDecimal(event.get("amount").toString());
         String currency    = (String) event.get("currency");
 
+        if (cancelledPaymentRepository.existsByPaymentId(paymentId)) {
+            log.warn("Rejecting fraud.cleared for CANCELLED payment: paymentId={}",
+                    paymentId);
+            outboxService.save(paymentId, "LEDGER", "LEDGER_FAILED", Map.of(
+                    "paymentId", paymentId.toString(),
+                    "reason",    "Payment was cancelled before ledger processing"
+            ));
+            return;
+        }
         if (journalEntryRepository.existsByPaymentId(paymentId)) {
             log.info("Skipping duplicate for paymentId: {}", paymentId);
             return;
         }
+
 
         BigDecimal currentBalance = getBalance(fromAccountId, currency);
 
@@ -215,7 +220,96 @@ public class LedgerService {
                 .build();
     }
 
+    @Transactional
+    public void reversePayment(Map<String, Object> event) {
+        UUID paymentId = UUID.fromString((String) event.get("paymentId"));
+        if (!journalEntryRepository.existsByPaymentId(paymentId)) {
+            log.info("No journal entries found for reversal. " +
+                    "Publishing ledger.reversed as no-op. paymentId={}", paymentId);
+            outboxService.save(paymentId, "LEDGER", "LEDGER_REVERSED", Map.of(
+                    "paymentId", paymentId.toString(),
+                    "reason",    "No entries to reverse"
+            ));
+            return;
+        }
 
+        String reversalRef = "REVERSAL-" + paymentId + "-CREDIT";
+        if (journalEntryRepository.existsByEntryRef(reversalRef)) {
+            log.info("Reversal already processed for paymentId={}. Skipping.",
+                    paymentId);
+            return;
+        }
+
+        List<JournalEntry> originalEntries = journalEntryRepository
+                .findByPaymentId(paymentId);
+
+        JournalEntry originalDebit = originalEntries.stream()
+                .filter(e -> "DEBIT".equals(e.getEntryType()))
+                .findFirst()
+                .orElse(null);
+
+        if (originalDebit == null) {
+            log.error("Cannot reverse — no DEBIT entry found for paymentId={}",
+                    paymentId);
+            return;
+        }
+
+        UUID sourceAccountId = originalDebit.getAccountId();
+        UUID destAccountId   = originalDebit.getCounterpartId();
+        BigDecimal amount    = originalDebit.getAmount();
+        String currency      = originalDebit.getCurrency();
+
+
+        JournalEntry reversalCredit = JournalEntry.builder()
+                .paymentId(paymentId)
+                .accountId(sourceAccountId)
+                .counterpartId(destAccountId)
+                .entryType("CREDIT")
+                .amount(amount)
+                .currency(currency)
+                .entryRef("REVERSAL-" + paymentId + "-CREDIT")
+                .narration("Reversal: credit back to source account")
+                .build();
+
+
+        JournalEntry reversalDebit = JournalEntry.builder()
+                .paymentId(paymentId)
+                .accountId(destAccountId)
+                .counterpartId(sourceAccountId)
+                .entryType("DEBIT")
+                .amount(amount)
+                .currency(currency)
+                .entryRef("REVERSAL-" + paymentId + "-DEBIT")
+                .narration("Reversal: debit back from destination account")
+                .build();
+
+        journalEntryRepository.saveAll(List.of(reversalCredit, reversalDebit));
+
+        outboxService.save(paymentId, "LEDGER", "LEDGER_REVERSED", Map.of(
+                "paymentId", paymentId.toString(),
+                "amount",    amount,
+                "currency",  currency
+        ));
+
+        log.info("Reversal complete for paymentId={} amount={} {}",
+                paymentId, amount, currency);
+    }
+
+    @Transactional
+    public void cancelPayment(Map<String,Object> event){
+        UUID paymentId = UUID.fromString((String) event.get("paymentId"));
+        String reason = (String) event.get("reason");
+        if (!cancelledPaymentRepository.existsByPaymentId(paymentId)) {
+            cancelledPaymentRepository.save(
+                    CancelledPayment.builder()
+                            .paymentId(paymentId)
+                            .reason(reason)
+                            .build()
+            );
+            log.info("Payment recorded as cancelled in ledger: paymentId={}",
+                    paymentId);
+        }
+    }
 
 
 }

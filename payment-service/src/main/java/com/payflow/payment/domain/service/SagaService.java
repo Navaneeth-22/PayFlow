@@ -100,8 +100,7 @@ public class SagaService {
             return;
         }
         if (saga.getStatus() != SagaStatus.DEBITING) {
-            log.warn("LEDGER_DEBITED: wrong state. paymentId={} currentStatus={}",
-                    paymentId, saga.getStatus());
+            log.warn("LEDGER_DEBITED: wrong state. paymentId={} currentStatus={}", paymentId, saga.getStatus());
             return;
         }
 
@@ -172,5 +171,32 @@ public class SagaService {
         );
 
         log.info("Saga FAILED (ledger) for paymentId={} reason={}", paymentId, reason);
+    }
+
+    @Transactional
+    public void handleLedgerReversed(Map<String, Object> event) {
+        UUID paymentId = UUID.fromString((String) event.get("paymentId"));
+
+        SagaState saga = sagaStateRepository.findById(paymentId).orElse(null);
+        if (saga == null) {
+            log.warn("LEDGER_REVERSED: no saga found. paymentId={}", paymentId);
+            return;
+        }
+        if (saga.getStatus() != SagaStatus.REVERSAL_NEEDED) {
+            log.warn("LEDGER_REVERSED: wrong state. paymentId={} status={}",
+                    paymentId, saga.getStatus());
+            return;
+        }
+
+        saga.setStatus(SagaStatus.REVERSED);
+        saga.setLastEvent("LEDGER_REVERSED");
+        sagaStateRepository.save(saga);
+
+        paymentRepository.findById(paymentId).ifPresent(payment -> {
+            payment.setStatus(PaymentStatus.REVERSED);
+            paymentRepository.save(payment);
+        });
+
+        log.info("Saga REVERSED for paymentId={} — money returned", paymentId);
     }
 }

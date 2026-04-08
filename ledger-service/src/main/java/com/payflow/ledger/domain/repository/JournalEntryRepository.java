@@ -8,10 +8,13 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.UUID;
 
 public interface JournalEntryRepository extends JpaRepository<JournalEntry, UUID> {
     boolean existsByPaymentId(UUID paymentId);
 
     boolean existsByEntryRef(String entryRef);
+
+    List<JournalEntry> findByPaymentId(UUID paymentId);
 }
