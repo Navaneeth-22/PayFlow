@@ -44,6 +44,12 @@ public class OutboxEvent {
     @Column(name = "created_at", updatable = false)
     private Instant createdAt;
 
+    @Column(name = "claimed_at")
+    private Instant claimedAt;
+
+    @Column(name = "claimed_by")
+    private String claimedBy;
+
     @PrePersist
     protected void onCreate() {
         createdAt = Instant.now();

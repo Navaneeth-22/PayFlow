@@ -124,11 +124,8 @@ public class LedgerService {
 
     @Transactional(readOnly = true)
     public BigDecimal verifyDoubleEntryInvariant() {
-        return journalEntryRepository.findAll().stream()
-                .map(e -> e.getEntryType().equals("CREDIT")
-                        ? e.getAmount()
-                        : e.getAmount().negate())
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal result = journalEntryRepository.computeGlobalInvariant();
+        return result != null ? result : BigDecimal.ZERO;
     }
 
     @Transactional

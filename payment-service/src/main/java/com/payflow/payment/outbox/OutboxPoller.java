@@ -1,55 +1,73 @@
 package com.payflow.payment.outbox;
 
-import com.payflow.payment.domain.repository.OutboxEventRepository;
+import com.payflow.payment.domain.model.OutboxEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
 
 @Component
 @RequiredArgsConstructor
 @Slf4j
 public class OutboxPoller {
 
-    private final OutboxEventRepository outboxEventRepository;
+    private final OutboxPublisher outboxPublisher;
     private final KafkaTemplate<String, Object> kafkaTemplate;
-    @Scheduled(fixedDelay = 500)
-    @Transactional
-    public void publishPendingEvents() {
-        var unpublished = outboxEventRepository
-                .findTop100ByPublishedFalseOrderByCreatedAtAsc();
 
-        for (var event : unpublished) {
+    private final String instanceId = UUID.randomUUID().toString();
+    private static final Duration CLAIM_TTL = Duration.ofSeconds(30);
+
+    @Scheduled(fixedDelay = 500)
+    public void publishPendingEvents() {
+
+        Instant expiry = Instant.now().minus(CLAIM_TTL);
+        int claimed = outboxPublisher.claimRows(
+                instanceId, Instant.now(), expiry, 100
+        );
+        if (claimed == 0) return;
+
+        List<OutboxEvent> mine = outboxPublisher.fetchClaimedBy(instanceId);
+
+        List<UUID> successIds = new ArrayList<>();
+        for (var event : mine) {
             try {
                 String topic = event.getEventType()
-                        .toLowerCase()
-                        .replace("_", ".");
+                        .toLowerCase().replace("_", ".");
+                String partitionKey = resolvePartitionKey(event);
 
-                String partitionKey = event.getPayload().containsKey("fromAccountId")
-                        ? (String) event.getPayload().get("fromAccountId")
-                        : event.getAggregateId().toString();
+                kafkaTemplate.send(topic, partitionKey, event.getPayload()).get();
+                successIds.add(event.getId());
 
-                kafkaTemplate.send(
-                        topic,
-                        partitionKey,
-                        event.getPayload()
-                ).get();
-
-                event.setPublished(true);
-                event.setPublishedAt(Instant.now());
-                outboxEventRepository.save(event);
-
-                log.debug("Published {} to topic '{}' for aggregateId: {}",
-                        event.getEventType(), topic, event.getAggregateId());
+                log.debug("Published {} for aggregateId: {}",
+                        event.getEventType(), event.getAggregateId());
 
             } catch (Exception e) {
                 log.error("Failed to publish outbox event {}: {}",
                         event.getId(), e.getMessage());
             }
         }
+
+        if (!successIds.isEmpty()) {
+            outboxPublisher.markPublished(successIds, Instant.now());
+        }
+    }
+
+    private String resolvePartitionKey(OutboxEvent event) {
+        return switch (event.getEventType()) {
+            case "PAYMENT_INITIATED",
+                 "PAYMENT_REVERSAL_NEEDED" -> {
+                Object key = event.getPayload().get("fromAccountId");
+                yield key != null ? key.toString()
+                        : event.getAggregateId().toString();
+            }
+            default -> event.getAggregateId().toString();
+        };
     }
 }

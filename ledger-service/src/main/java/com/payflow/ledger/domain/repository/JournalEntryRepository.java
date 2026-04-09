@@ -21,4 +21,12 @@ public interface JournalEntryRepository extends JpaRepository<JournalEntry, UUID
     @Query(value = "SELECT pg_advisory_xact_lock(hashtext(:accountId))",
             nativeQuery = true)
     void lockAccount(@Param("accountId") String accountId);
+
+    @Query(value = """
+    SELECT SUM(CASE WHEN entry_type = 'CREDIT'
+                    THEN amount
+                    ELSE -amount END)
+    FROM journal_entries
+    """, nativeQuery = true)
+    BigDecimal computeGlobalInvariant();
 }

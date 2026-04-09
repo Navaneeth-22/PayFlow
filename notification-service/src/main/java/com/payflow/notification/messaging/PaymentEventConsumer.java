@@ -20,14 +20,9 @@ public class PaymentEventConsumer {
             groupId = "notification-completed-group"
     )
     public void onPaymentCompleted(Map<String, Object> event) {
-        try {
             log.info("PAYMENT_COMPLETED received: paymentId={}",
                     event.get("paymentId"));
             notificationService.handlePaymentEvent(event, "PAYMENT_COMPLETED");
-        } catch (Exception e) {
-            log.error("Failed to handle PAYMENT_COMPLETED: paymentId={} error={}",
-                    event.get("paymentId"), e.getMessage(), e);
-        }
     }
 
     @KafkaListener(
@@ -35,13 +30,8 @@ public class PaymentEventConsumer {
             groupId = "notification-failed-group"
     )
     public void onPaymentFailed(Map<String, Object> event) {
-        try {
             log.info("PAYMENT_FAILED received: paymentId={}",
                     event.get("paymentId"));
             notificationService.handlePaymentEvent(event, "PAYMENT_FAILED");
-        } catch (Exception e) {
-            log.error("Failed to handle PAYMENT_FAILED: paymentId={} error={}",
-                    event.get("paymentId"), e.getMessage(), e);
-        }
     }
 }

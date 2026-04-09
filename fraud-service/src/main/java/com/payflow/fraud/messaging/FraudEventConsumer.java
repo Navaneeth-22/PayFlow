@@ -18,12 +18,8 @@ public class FraudEventConsumer {
             groupId = "fraud-service-group"
     )
     public void onPaymentInitiated(PaymentInitiatedEvent event) {
-        try{
             log.info("Received PAYMENT_INITIATED: paymentId={} amount={}",
                     event.getPaymentId(), event.getAmount());
             fraudEvaluationService.evaluate(event);
-        } catch (Exception e) {
-            log.error("Failed to evaluate the PaymentId={} error={}",event.getPaymentId(),e.getMessage(),e);
-        }
     }
 }

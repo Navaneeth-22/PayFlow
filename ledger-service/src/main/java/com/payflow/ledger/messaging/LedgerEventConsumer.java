@@ -24,14 +24,9 @@ public class LedgerEventConsumer {
             groupId = "ledger-service-fraud-group"
     )
     public void onFraudCleared(Map<String, Object> event) {
-        try {
             log.info("FRAUD_CLEARED received by ledger: paymentId={}",
                     event.get("paymentId"));
             ledgerService.processPayment(event);
-        } catch (Exception e) {
-            log.error("Unexpected failure in ledger processing paymentId={} error={}",
-                    event.get("paymentId"), e.getMessage(), e);
-        }
     }
 
     @KafkaListener(
@@ -39,13 +34,8 @@ public class LedgerEventConsumer {
             groupId = "ledger-payment-cancelled-group"
     )
     public void onPaymentCancelled(Map<String, Object> event) {
-        try {
             log.info("PAYMENT_CANCELLED received by ledger: paymentId={}", event.get("paymentId"));
             ledgerService.cancelPayment(event);
-        } catch (Exception e) {
-            log.error("Failed to process PAYMENT_CANCELLED: {} error={}",
-                    event, e.getMessage(), e);
-        }
     }
 
     @KafkaListener(
@@ -53,13 +43,8 @@ public class LedgerEventConsumer {
             groupId = "ledger-reversal-group"
     )
     public void onPaymentReversalNeeded(Map<String, Object> event) {
-        try {
             log.info("PAYMENT_REVERSAL_NEEDED received: paymentId={}",
                     event.get("paymentId"));
             ledgerService.reversePayment(event);
-        } catch (Exception e) {
-            log.error("Failed to process PAYMENT_REVERSAL_NEEDED: paymentId={} error={}",
-                    event.get("paymentId"), e.getMessage(), e);
-        }
     }
 }
