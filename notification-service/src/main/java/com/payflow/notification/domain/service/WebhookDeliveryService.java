@@ -3,6 +3,7 @@ package com.payflow.notification.domain.service;
 import com.payflow.notification.domain.model.Webhook;
 import com.payflow.notification.domain.model.WebhookDelivery;
 import com.payflow.notification.domain.repository.WebhookDeliveryRepository;
+import com.payflow.notification.metrics.NotificationMetrics;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -25,6 +26,7 @@ public class WebhookDeliveryService {
     private final WebhookSigningService signingService;
     private final RestClient restClient;
     private final ObjectMapper objectMapper;
+    private final NotificationMetrics notificationMetrics;
 
     @Value("${webhook.max-attempts:5}")
     private int maxAttempts;
@@ -64,11 +66,13 @@ public class WebhookDeliveryService {
 
             if (response.getStatusCode().is2xxSuccessful()) {
                 delivery.setStatus("DELIVERED");
+                notificationMetrics.delivered();
                 log.info("Webhook DELIVERED: deliveryId={} attempt={}",
                         delivery.getId(), delivery.getAttemptCount());
             } else {
                 log.warn("Webhook delivery failed with HTTP {}: deliveryId={} attempt={}",
                         httpStatus, delivery.getId(), delivery.getAttemptCount());
+                notificationMetrics.failed();
                 scheduleRetry(delivery);
             }
 
@@ -85,6 +89,7 @@ public class WebhookDeliveryService {
     private void scheduleRetry(WebhookDelivery delivery) {
         if (delivery.getAttemptCount() >= maxAttempts) {
             delivery.setStatus("EXHAUSTED");
+            notificationMetrics.exhausted();
             log.warn("Webhook EXHAUSTED after {} attempts: deliveryId={}",
                     maxAttempts, delivery.getId());
             return;

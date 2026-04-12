@@ -7,6 +7,7 @@ import com.payflow.ledger.domain.model.*;
 import com.payflow.ledger.domain.repository.*;
 import com.payflow.ledger.exception.DuplicateEntryException;
 import com.payflow.ledger.exception.LedgerException;
+import com.payflow.ledger.metrics.LedgerMetrics;
 import com.payflow.ledger.outbox.OutboxService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -33,6 +34,7 @@ public class LedgerService {
     private final SystemAccountRepository systemAccountRepository;
     private final OutboxService outboxService;
     private final CancelledPaymentRepository cancelledPaymentRepository;
+    private final LedgerMetrics ledgerMetrics;
 
     @Transactional
     public void processPayment(Map<String, Object> event) {
@@ -65,6 +67,7 @@ public class LedgerService {
         if (currentBalance.compareTo(amount) < 0) {
             log.warn("Insufficient funds for paymentId: {} balance: {} amount: {}",
                     paymentId, currentBalance, amount);
+            ledgerMetrics.paymentFailed();
             outboxService.save(paymentId, "LEDGER", "LEDGER_FAILED", Map.of(
                     "paymentId", paymentId.toString(),
                     "reason", "Insufficient funds. Balance: " + currentBalance
@@ -96,6 +99,8 @@ public class LedgerService {
                 .build();
 
         journalEntryRepository.saveAll(List.of(debit, credit));
+        ledgerMetrics.paymentProcessed();
+        ledgerMetrics.entriesCreated(2);
 
         outboxService.save(paymentId, "LEDGER", "LEDGER_DEBITED", Map.of(
                 "paymentId",     paymentId.toString(),
@@ -284,7 +289,8 @@ public class LedgerService {
                 .build();
 
         journalEntryRepository.saveAll(List.of(reversalCredit, reversalDebit));
-
+        ledgerMetrics.reversalProcessed();
+        ledgerMetrics.entriesCreated(2);
         outboxService.save(paymentId, "LEDGER", "LEDGER_REVERSED", Map.of(
                 "paymentId", paymentId.toString(),
                 "amount",    amount,

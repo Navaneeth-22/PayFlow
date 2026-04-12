@@ -2,6 +2,7 @@ package com.payflow.payment.idempotency;
 
 import com.payflow.payment.exception.IdempotencyKeyMismatchException;
 import com.payflow.payment.exception.MissingIdempotencyKeyException;
+import com.payflow.payment.metrics.PaymentMetrics;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -27,6 +28,7 @@ public class IdempotencyFilter extends OncePerRequestFilter {
 
     private final IdempotencyService idempotencyService;
     private final ObjectMapper objectMapper;
+    private final PaymentMetrics paymentMetrics;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
@@ -61,9 +63,11 @@ public class IdempotencyFilter extends OncePerRequestFilter {
                 writeError(response, HttpStatus.UNPROCESSABLE_ENTITY,
                         "Request body does not match original request " +
                                 "for this idempotency key");
+                paymentMetrics.idempotencyMismatch();
                 return;
             }
             writeStoredResponse(response, cached.get());
+            paymentMetrics.idempotencyHit();
             return;
         }
 
@@ -74,6 +78,7 @@ public class IdempotencyFilter extends OncePerRequestFilter {
                 writeError(response, HttpStatus.UNPROCESSABLE_ENTITY,
                         "Request body does not match original request " +
                                 "for this idempotency key");
+                paymentMetrics.idempotencyMismatch();
                 return;
             }
             idempotencyService.repopulateCache(key, dbRecord.get());

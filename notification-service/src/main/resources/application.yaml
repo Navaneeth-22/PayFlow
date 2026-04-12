@@ -48,11 +48,19 @@ spring:
       name: admin
       password: admin
 
+# ── Actuator ────────────────────────────────────────────────
 management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+  prometheus:
+    metrics:
+      export:
+        enabled: true
 
 spring.threads.virtual.enabled: true
 

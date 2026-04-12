@@ -5,9 +5,12 @@ import com.payflow.payment.api.dto.PaymentResponse;
 import com.payflow.payment.domain.model.*;
 import com.payflow.payment.domain.repository.*;
 import com.payflow.payment.exception.AccountNotFoundException;
+import com.payflow.payment.exception.PayflowException;
+import com.payflow.payment.metrics.PaymentMetrics;
 import com.payflow.payment.outbox.OutboxService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,6 +26,7 @@ public class PaymentService {
     private final AccountRepository accountRepository;
     private final SagaStateRepository sagaStateRepository;
     private final OutboxService outboxService;
+    private final PaymentMetrics paymentMetrics;
 
     @Transactional
     public PaymentResponse initiatePayment(CreatePaymentRequest request,
@@ -39,7 +43,10 @@ public class PaymentService {
                         request.getToAccountId().toString()));
 
         if (sourceAccount.getId().equals(destAccount.getId())) {
-            throw new IllegalArgumentException("Cannot transfer to the same account");
+            throw new PayflowException(
+                    "Cannot transfer to the same account",
+                    HttpStatus.BAD_REQUEST
+            );
         }
 
         Payment payment = Payment.builder()
@@ -52,7 +59,7 @@ public class PaymentService {
                 .metadata(request.getMetadata())
                 .build();
         paymentRepository.save(payment);
-
+        paymentMetrics.paymentInitiated();
         SagaState sagaState = SagaState.builder()
                 .paymentId(payment.getId())
                 .status(SagaStatus.FRAUD_CHECK)

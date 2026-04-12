@@ -2,6 +2,7 @@ package com.payflow.payment.domain.service;
 
 import com.payflow.payment.domain.model.*;
 import com.payflow.payment.domain.repository.*;
+import com.payflow.payment.metrics.PaymentMetrics;
 import com.payflow.payment.outbox.OutboxService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,6 +19,7 @@ public class SagaService {
     private final SagaStateRepository sagaStateRepository;
     private final PaymentRepository paymentRepository;
     private final OutboxService outboxService;
+    private final PaymentMetrics paymentMetrics;
 
     @Transactional
     public void handleFraudCleared(Map<String, Object> event) {
@@ -72,6 +74,7 @@ public class SagaService {
             paymentRepository.save(payment);
         });
 
+        paymentMetrics.paymentFailed("Fraud check failed: " + reason);
         outboxService.save(
                 paymentId,
                 "PAYMENT",
@@ -83,7 +86,6 @@ public class SagaService {
                         "status",         "FAILED"
                 )
         );
-
         log.info("Saga FAILED (fraud) for paymentId={} reason={}", paymentId, reason);
     }
 
@@ -126,7 +128,7 @@ public class SagaService {
             );
         });
 
-
+        paymentMetrics.paymentCompleted();
         log.info("Saga COMPLETED for paymentId={} — money has moved", paymentId);
     }
 
@@ -158,6 +160,7 @@ public class SagaService {
             payment.setFailureReason(reason);
             paymentRepository.save(payment);
         });
+        paymentMetrics.paymentFailed(reason);
         outboxService.save(
                 paymentId,
                 "PAYMENT",
@@ -169,7 +172,6 @@ public class SagaService {
                         "status",         "FAILED"
                 )
         );
-
         log.info("Saga FAILED (ledger) for paymentId={} reason={}", paymentId, reason);
     }
 

@@ -2,6 +2,7 @@ package com.payflow.payment.saga;
 
 import com.payflow.payment.domain.model.*;
 import com.payflow.payment.domain.repository.*;
+import com.payflow.payment.metrics.PaymentMetrics;
 import com.payflow.payment.outbox.OutboxService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,6 +29,7 @@ public class StuckSagaDetector {
             SagaStatus.FRAUD_CHECK,
             SagaStatus.DEBITING
     );
+    private final PaymentMetrics paymentMetrics;
 
     @Scheduled(fixedDelay = 60_000)
     @Transactional
@@ -105,5 +107,6 @@ public class StuckSagaDetector {
             log.warn("Stuck DEBITING → REVERSAL_NEEDED. paymentId={}",
                     saga.getPaymentId());
         }
+        paymentMetrics.sagaStuckDetected();
     }
 }

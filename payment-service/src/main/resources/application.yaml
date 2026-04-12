@@ -94,10 +94,10 @@ management:
   endpoint:
     health:
       show-details: always
-#  prometheus:
-#    metrics:
-#      export:
-#        enabled: true
+  prometheus:
+    metrics:
+      export:
+        enabled: true
 
 # ── Virtual Threads (Java 21) ────────────────────────────────
 spring.threads.virtual.enabled: true
