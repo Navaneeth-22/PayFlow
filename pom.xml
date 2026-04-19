@@ -16,7 +16,7 @@
         <module>ledger-service</module>
         <module>fraud-service</module>
         <module>notification-service</module>
-<!--        <module>api-gateway</module>-->
+        <module>api-gateway</module>
     </modules>
 
     <parent>
@@ -32,9 +32,8 @@
         <maven.compiler.target>21</maven.compiler.target>
         <resilience4j.version>2.3.0</resilience4j.version>   <!-- updated for Boot 4 -->
         <mapstruct.version>1.5.5.Final</mapstruct.version>
-        <testcontainers.version>1.19.8</testcontainers.version>
+        <testcontainers.version>2.0.4</testcontainers.version>
     </properties>
-
     <dependencyManagement>
         <dependencies>
             <!-- Resilience4j BOM -->
@@ -53,7 +52,21 @@
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
+                <dependency>
+                    <groupId>org.springframework.cloud</groupId>
+                    <artifactId>spring-cloud-dependencies</artifactId>
+                    <version>2025.1.1</version>
+                    <type>pom</type>
+                    <scope>import</scope>
+                </dependency>
+            <dependency>
+                <groupId>org.awaitility</groupId>
+                <artifactId>awaitility</artifactId>
+                <version>4.2.1</version>
+                <scope>test</scope>
+            </dependency>
         </dependencies>
+
     </dependencyManagement>
 
     <!-- Dependencies every service gets automatically -->
@@ -70,9 +83,10 @@
         </dependency>
         <dependency>
             <groupId>org.testcontainers</groupId>
-            <artifactId>junit-jupiter</artifactId>
+            <artifactId>testcontainers-junit-jupiter</artifactId>
             <scope>test</scope>
         </dependency>
+
     </dependencies>
 
     <build>

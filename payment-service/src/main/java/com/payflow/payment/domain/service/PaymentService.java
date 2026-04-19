@@ -30,7 +30,9 @@ public class PaymentService {
 
     @Transactional
     public PaymentResponse initiatePayment(CreatePaymentRequest request,
-                                           String idempotencyKey) {
+                                           String idempotencyKey,
+                                           String userId
+    ) {
 
         Account sourceAccount = accountRepository
                 .findById(request.getFromAccountId())
@@ -42,6 +44,16 @@ public class PaymentService {
                 .orElseThrow(() -> new AccountNotFoundException(
                         request.getToAccountId().toString()));
 
+        if (userId != null &&
+                !sourceAccount.getUserId().toString().equals(userId)) {
+            log.warn("Ownership violation: userId={} tried to debit " +
+                            "accountId={} owned by={}", userId,
+                    sourceAccount.getId(), sourceAccount.getUserId());
+            throw new PayflowException(
+                    "You are not authorized to transact from this account",
+                    HttpStatus.FORBIDDEN
+            );
+        }
         if (sourceAccount.getId().equals(destAccount.getId())) {
             throw new PayflowException(
                     "Cannot transfer to the same account",

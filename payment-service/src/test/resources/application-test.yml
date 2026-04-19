@@ -1,0 +1,15 @@
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+  flyway:
+    enabled: false
+  kafka:
+    consumer:
+      auto-offset-reset: earliest
+
+logging:
+  level:
+    com.payflow: DEBUG
+    org.testcontainers: INFO

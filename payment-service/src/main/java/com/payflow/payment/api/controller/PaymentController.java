@@ -23,9 +23,10 @@ public class PaymentController {
     @PostMapping
     public ResponseEntity<PaymentResponse> initiatePayment(
             @RequestHeader("X-Idempotency-Key") String idempotencyKey,
+            @RequestHeader(value = "X-User-Id", required = false) String userId,
             @Valid @RequestBody CreatePaymentRequest request) {
 
-        PaymentResponse response = paymentService.initiatePayment(request, idempotencyKey);
+        PaymentResponse response = paymentService.initiatePayment(request, idempotencyKey, userId);
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(response);
     }
 
