@@ -122,3 +122,7 @@ spring:
 First version of the rate limiter used Redis `INCR` then `EXPIRE` as two separate commands. If the pod crashed between those two commands, the key lived in Redis forever with no expiry — permanently locking that user out.
 
 Rewrote it as a Lua script so the increment, refill calculation, and TTL update happen atomically in one Redis operation. Redis executes Lua scripts as a single unbreakable unit — no partial state possible.
+
+
+## License
+This project is licensed under the MIT License.
